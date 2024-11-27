@@ -61,10 +61,7 @@ app.post(
 	// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	async (req: Request<any>, res: any) => {
 		try {
-			const caseText =
-				"27-11-2024 08:55 	New Customer Note Added. Note: Pickup location is round the back of Sainsbury's 	andy" +
-				"27-11-2024 08:55 	New Customer Note Added. Note: Don't assign to Alex S. He's dodgy 	andy" +
-				"27-11-2024 08:53 	New Customer Note Added. Note: This is me making a note to try and trigger some history 	andy";
+			const {caseText} = req.body;
 
 			// if (!caseText) {
 			// 	return res.status(400).json({
