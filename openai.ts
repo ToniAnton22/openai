@@ -1,189 +1,129 @@
-import OpenAI from 'openai';
-import Configuration from "openai"
-import dotenv from 'dotenv';
+import { OpenAI } from "openai";
+import dotenv from "dotenv";
 
-// Load environment variables
 dotenv.config();
 
-// Types for our case processing
-interface CaseReference {
-    lineNumber: number;
-    content: string;
-    context: string;
-}
-
 interface CaseAnalysis {
-    summary: string;
-    keyPoints: string[];
-    references: CaseReference[];
-    nextSteps: string[];
-    confidence: number;
+  summary: string;
+  nextSteps: string[];
 }
 
 interface ProcessingOptions {
-    maxTokensPerChunk: number;
-    overlapTokens: number;
-    minConfidence: number;
+  maxTokensPerChunk: number;
+  overlapTokens: number;
 }
 
 export class CaseProcessor {
-    private openai: OpenAI;
-    private options: ProcessingOptions;
+  private openai: OpenAI;
+  private options: ProcessingOptions;
 
-    constructor(apiKey: string, options?: Partial<ProcessingOptions>) {
-        this.openai = new OpenAI({
-            apiKey: apiKey
-        });
-        
-        // Default options with reasonable values
-        this.options = {
-            maxTokensPerChunk: 2000,
-            overlapTokens: 200,
-            minConfidence: 0.7,
-            ...options
-        };
+  constructor(apiKey: string, options?: Partial<ProcessingOptions>) {
+    this.openai = new OpenAI({
+      apiKey: apiKey,
+    });
+
+    this.options = {
+      maxTokensPerChunk: 2000,
+      overlapTokens: 200,
+      ...options,
+    };
+  }
+
+  private async splitIntoChunks(text: string): Promise<string[]> {
+    const chunkSize = Math.min(this.options.maxTokensPerChunk * 4, 8000);
+    const overlap = Math.min(this.options.overlapTokens * 4, 1000);
+    const chunks: string[] = [];
+
+    let startIndex = 0;
+    while (startIndex < text.length) {
+      const chunk = text.slice(startIndex, startIndex + chunkSize);
+      if (chunk.length === 0) break;
+
+      const breakPoint = chunk.lastIndexOf(". ", chunk.length * 0.8) + 1 || chunk.length;
+      chunks.push(chunk.slice(0, breakPoint));
+      startIndex += breakPoint - overlap;
     }
 
-    private async splitIntoChunks(text: string): Promise<string[]> {
-        // Simple approximation: 1 token ≈ 4 characters
-        const chunkSize = this.options.maxTokensPerChunk * 4;
-        const overlap = this.options.overlapTokens * 4;
-        const chunks: string[] = [];
-        
-        let startIndex = 0;
-        while (startIndex < text.length) {
-            let chunk = text.slice(startIndex, startIndex + chunkSize);
-            
-            // Try to break at paragraph or sentence
-            if (startIndex + chunkSize < text.length) {
-                const lastParagraph = chunk.lastIndexOf('\n\n');
-                const lastSentence = chunk.lastIndexOf('. ');
-                const breakPoint = lastParagraph > chunk.length / 2 ? lastParagraph : 
-                                 lastSentence > chunk.length / 2 ? lastSentence + 1 : 
-                                 chunk.length;
-                chunk = chunk.slice(0, breakPoint);
-            }
-            
-            chunks.push(chunk);
-            startIndex += chunk.length - overlap;
+    return chunks;
+  }
+
+  private async analyzeChunk(chunk: string): Promise<Partial<CaseAnalysis>> {
+    const prompt = `
+      Analyze this portion of a case and provide:
+      1. A brief summary of what happened (2-3 sentences)
+      2. Suggested next steps based on this information (if any)
+
+      Focus on concrete facts and clear action items. Be concise and direct.
+
+      Text to analyze:
+      ${chunk}
+    `;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a precise case analyst. Provide clear, actionable summaries focusing only on verified facts."
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.3
+      });
+
+      const content = response.choices[0].message?.content || "";
+      const [summary, nextStepsSection] = content.split(/next steps:/i);
+
+      return {
+        summary: summary.trim(),
+        nextSteps: nextStepsSection 
+          ? nextStepsSection.split('\n').filter(step => step.trim())
+          : []
+      };
+    } catch (error) {
+      console.error("Error analyzing chunk:", error);
+      throw error;
+    }
+  }
+
+  public async processCase(caseText: string): Promise<CaseAnalysis> {
+    if (!caseText || typeof caseText !== "string") {
+      throw new Error("Invalid input: caseText must be a non-empty string");
+    }
+
+    if (caseText.length > 1000000) { // 1MB limit
+      throw new Error("Text size exceeds maximum limit of 1MB");
+    }
+
+    const chunks = await this.splitIntoChunks(caseText);
+    const analyses = await Promise.all(chunks.map(this.analyzeChunk.bind(this)));
+
+    // Combine all summaries for a final analysis
+    const combinedSummaries = analyses.map(a => a.summary).join(" ");
+    const finalResponse = await this.openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "Create a concise final summary and clear next steps based on the analyzed information."
+        },
+        {
+          role: "user",
+          content: `Provide a final analysis with:\n1. A clear summary of what happened\n2. Prioritized next steps\n\nBased on these analyses:\n${combinedSummaries}`
         }
-        
-        return chunks;
-    }
+      ],
+      temperature: 0.3
+    });
 
-    private async analyzeChunk(chunk: string, chunkIndex: number): Promise<Partial<CaseAnalysis>> {
-        const prompt = `
-            Analyze this portion of a client case. Provide:
-            1. A brief summary of key points
-            2. Important references with line numbers
-            3. Any potential next steps based on this information
-            4. A confidence score (0-1) about the completeness of your analysis
+    const content = finalResponse.choices[0].message?.content || "";
+    const [summary, nextStepsSection] = content.split(/next steps:/i);
 
-            Remember:
-            - Only include factual information present in the text
-            - Mark any uncertain conclusions clearly
-            - Include specific line references for all key points
-            
-            Text to analyze:
-            ${chunk}
-        `;
-
-        try {
-            const response = await this.openai.chat.completions.create({
-                model: "gpt-4",
-                messages: [
-                    { 
-                        role: "system", 
-                        content: "You are a precise case analysis assistant. Only make statements backed by the text. Maintain high accuracy over completeness." 
-                    },
-                    { role: "user", content: prompt }
-                ],
-                temperature: 0.3  // Lower temperature for more consistent outputs
-            });
-
-            // Parse the response and extract structured information
-            const content = response.choices[0].message?.content || '';
-            
-            // You would need to implement proper parsing of the GPT response here
-            // This is a simplified version
-            return this.parseGPTResponse(content, chunkIndex * this.options.maxTokensPerChunk);
-        } catch (error) {
-            console.error(`Error analyzing chunk ${chunkIndex}:`, error);
-            throw error;
-        }
-    }
-
-    private parseGPTResponse(content: string, baseLineNumber: number): Partial<CaseAnalysis> {
-        // Implement proper parsing logic here
-        // This is a simplified version
-        const sections = content.split('\n\n');
-        
-        return {
-            keyPoints: sections.find(s => s.includes('key points'))?.split('\n').slice(1) || [],
-            references: sections.find(s => s.includes('references'))
-                ?.split('\n')
-                .slice(1)
-                .map(ref => ({
-                    lineNumber: baseLineNumber + Number.parseInt(ref.match(/line (\d+)/)?.[1] || '0'),
-                    content: ref,
-                    context: ref
-                })) || [],
-            nextSteps: sections.find(s => s.includes('next steps'))?.split('\n').slice(1) || [],
-            confidence: Number.parseFloat(content.match(/confidence: (0\.\d+)/)?.[1] || '0')
-        };
-    }
-
-    public async processCase(caseText: string): Promise<CaseAnalysis> {
-        const chunks = await this.splitIntoChunks(caseText);
-        const chunkAnalyses = await Promise.all(
-            chunks.map((chunk, index) => this.analyzeChunk(chunk, index))
-        );
-        console.log("Before chuncks")
-        // Merge analyses from all chunks
-        const mergedAnalysis: CaseAnalysis = {
-            summary: '',
-            keyPoints: [],
-            references: [],
-            nextSteps: [],
-            confidence: 1
-        };
-
-        let totalConfidence = 0;
-        // biome-ignore lint/complexity/noForEach: <explanation>
-        chunkAnalyses.forEach(analysis => {
-            mergedAnalysis.keyPoints.push(...(analysis.keyPoints || []));
-            mergedAnalysis.references.push(...(analysis.references || []));
-            mergedAnalysis.nextSteps.push(...(analysis.nextSteps || []));
-            totalConfidence += analysis.confidence || 0;
-        });
-        console.log("After chunks")
-        // Calculate overall confidence
-        mergedAnalysis.confidence = totalConfidence / chunkAnalyses.length;
-
-        // Generate final summary
-        const summaryPrompt = `
-            Create a concise summary of this case based on these key points:
-            ${mergedAnalysis.keyPoints.join('\n')}
-        `;
-
-        const summaryResponse = await this.openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-                { role: "system", content: "Create a brief, factual summary based on the provided key points." },
-                { role: "user", content: "27-11-2024 08:55 	New Customer Note Added. Note: Pickup location is round the back of Sainsbury's 	andy" +
-				"27-11-2024 08:55 	New Customer Note Added. Note: Don't assign to Alex S. He's dodgy 	andy" +
-				"27-11-2024 08:53 	New Customer Note Added. Note: This is me making a note to try and trigger some history 	andy" }
-            ],
-            temperature: 0.3
-        });
-        console.log(summaryResponse)
-        mergedAnalysis.summary = summaryResponse.choices[0].message?.content || '';
-
-        // Filter out duplicate points and sort references
-        mergedAnalysis.keyPoints = [...new Set(mergedAnalysis.keyPoints)];
-        mergedAnalysis.references.sort((a, b) => a.lineNumber - b.lineNumber);
-        mergedAnalysis.nextSteps = [...new Set(mergedAnalysis.nextSteps)];
-
-        return mergedAnalysis;
-    }
+    return {
+      summary: summary.trim(),
+      nextSteps: nextStepsSection 
+        ? nextStepsSection.split('\n').filter(step => step.trim()).map(step => step.trim())
+        : []
+    };
+  }
 }

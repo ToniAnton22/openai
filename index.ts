@@ -2,7 +2,6 @@ import express, { type Request, type Response } from "express";
 import bodyParser from "body-parser";
 import { CaseProcessor } from "./openai";
 import dotenv from "dotenv";
-import { getOpenAIRes } from "./andy";
 
 // Load environment variables
 dotenv.config();
@@ -15,7 +14,6 @@ app.use(express.json());
 const caseProcessor = new CaseProcessor(process.env.OPENAI_API_KEY || "", {
 	maxTokensPerChunk: 2000,
 	overlapTokens: 200,
-	minConfidence: 0.7,
 });
 
 // Type definitions
@@ -61,7 +59,7 @@ app.post(
 	// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	async (req: Request<any>, res: any) => {
 		try {
-			const {caseText} = req.body;
+			const {caseText} = req.body
 
 			// if (!caseText) {
 			// 	return res.status(400).json({
@@ -69,10 +67,10 @@ app.post(
 			// 	});
 			// }
 			// Create a new processor instance if custom options are provided
-			const analysis = await getOpenAIRes(
-				caseText,
-				process.env.OPENAI_API_KEY ?? "",
-			);
+		
+			const processor = new CaseProcessor(process.env.OPENAI_API_KEY ?? "");
+			console.log("I got hit")
+			const analysis = await processor.processCase(caseText);
 
 			res.json({
 				message: "Case analysis completed successfully",
