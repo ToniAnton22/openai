@@ -89,24 +89,24 @@ export class CaseProcessor {
 			throw new Error("Text size exceeds maximum limit of 1MB");
 		}
 
-		const chunks = await this.splitIntoChunks(caseText);
-		const chunkSummaries = await Promise.all(
-			chunks.map(this.analyzeChunk.bind(this)),
-		);
+		//	const chunks = await this.splitIntoChunks(caseText);
+		//	const chunkSummaries = await Promise.all(
+		//		chunks.map(this.analyzeChunk.bind(this)),
+		//	);
 
 		// Combine all summaries for a final analysis
-		const combinedSummaries = chunkSummaries.join(" ");
+		//	const combinedSummaries = chunkSummaries.join(" ");
 		const finalResponse = await this.openai.chat.completions.create({
 			model: "gpt-3.5-turbo",
 			messages: [
 				{
 					role: "system",
 					content:
-						"Create a concise final summary based on the analyzed information. This MUST be less than 200 characters.",
+						"You are an assistant who will summarise the most important items in an account's history based on what you are provided. This must be less than 300 characters and should be in continuous prose",
 				},
 				{
 					role: "user",
-					content: `Provide a clear, concise summary of what happened based on these analyses:\n${combinedSummaries} This MUST be less than 200 characters.`,
+					content: `${caseText}`,
 				},
 			],
 			temperature: 0.3,
