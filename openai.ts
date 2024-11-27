@@ -153,4 +153,46 @@ export class CaseProcessor {
 			summary: finalResponse.choices[0].message?.content?.trim() || "",
 		};
 	}
+
+    public async processAnswerQuestions(context: {
+        summary:string,
+        nextSteps:string,
+        question:string
+    }): Promise<CaseAnalysis> {
+		if (!context.nextSteps || typeof context.nextSteps !== "string") {
+			throw new Error("Invalid input: caseText must be a non-empty string");
+		}
+
+		if (context.nextSteps.length > 1000000) {
+			// 1MB limit
+			throw new Error("Text size exceeds maximum limit of 1MB");
+		}
+
+		//	const chunks = await this.splitIntoChunks(caseText);
+		//	const chunkSummaries = await Promise.all(
+		//		chunks.map(this.analyzeChunk.bind(this)),
+		//	);
+
+		// Combine all summaries for a final analysis
+		//	const combinedSummaries = chunkSummaries.join(" ");
+		const finalResponse = await this.openai.chat.completions.create({
+			model: "gpt-3.5-turbo",
+			messages: [
+				{
+					role: "system",
+					content:
+						"You are an assistant who will answer any question give by our advisors for our advisors given the context. (maximum of 300 characters, dont go above that)",
+				},
+				{
+					role: "user",
+					content: `Asses the following question ${context?.question} using the following context and answer appropiately. Context: the summary of the account: ${context.summary} and these next steps: ${context.nextSteps}.`,
+				},
+			],
+			temperature: 0.3,
+		});
+
+		return {
+			summary: finalResponse.choices[0].message?.content?.trim() || "",
+		};
+	}
 }
