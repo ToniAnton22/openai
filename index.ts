@@ -10,7 +10,6 @@ const app = express();
 const port = 3000;
 
 app.use(express.json());
-
 // Initialize CaseProcessor
 const caseProcessor = new CaseProcessor(process.env.OPENAI_API_KEY || "", {
 	maxTokensPerChunk: 2000,
@@ -68,7 +67,6 @@ app.post(
 					error: "Case text is required",
 				});
 			}
-
 			// Create a new processor instance if custom options are provided
 			const processor = new CaseProcessor(caseText)
 

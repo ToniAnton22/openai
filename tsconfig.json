@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "CommonJS",
+		"outDir": "./dist",
+		"rootDir": "./",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"moduleResolution": "node",
+		"sourceMap": true,
+		"typeRoots": ["./node_modules/@types"]
+	},
+	"include": ["index.ts", "openai.ts", "ecosystem.config.ts"],
+	"exclude": ["node_modules", "dist"]
+}
