@@ -181,7 +181,7 @@ export class CaseProcessor {
 				{
 					role: "system",
 					content:
-						"You are an assistant who will answer any question give by our advisors for our advisors given the context. (maximum of 300 characters, dont go above that)",
+						"You are an assistant who will answer any question give by our advisors for our advisors given the context. Answer only questions about the case, customer or client. (maximum of 300 characters, dont go above that)",
 				},
 				{
 					role: "user",

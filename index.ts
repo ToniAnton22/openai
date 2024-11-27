@@ -153,7 +153,7 @@ app.post(
 			const analysis = await processor.processAnswerQuestions(context);
 
 			res.json({
-				message: "Next steps analysis succesful.",
+				message: "Answer given.",
 				analysis,
 				metadata: {
 					timestamp: new Date().toISOString(),
@@ -161,7 +161,7 @@ app.post(
 				},
 			});
 		} catch (error) {
-			console.error("Next steps analysis: ", error);
+			console.error("Answer given with error: ", error);
 
 			const errorMessage =
 				error instanceof Error ? error.message : "Unknown error occurred";
