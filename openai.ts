@@ -138,7 +138,7 @@ export class CaseProcessor {
         const chunkAnalyses = await Promise.all(
             chunks.map((chunk, index) => this.analyzeChunk(chunk, index))
         );
-
+        console.log("Before chuncks")
         // Merge analyses from all chunks
         const mergedAnalysis: CaseAnalysis = {
             summary: '',
@@ -156,7 +156,7 @@ export class CaseProcessor {
             mergedAnalysis.nextSteps.push(...(analysis.nextSteps || []));
             totalConfidence += analysis.confidence || 0;
         });
-
+        console.log("After chunks")
         // Calculate overall confidence
         mergedAnalysis.confidence = totalConfidence / chunkAnalyses.length;
 
@@ -170,11 +170,13 @@ export class CaseProcessor {
             model: "gpt-4",
             messages: [
                 { role: "system", content: "Create a brief, factual summary based on the provided key points." },
-                { role: "user", content: summaryPrompt }
+                { role: "user", content: "27-11-2024 08:55 	New Customer Note Added. Note: Pickup location is round the back of Sainsbury's 	andy" +
+				"27-11-2024 08:55 	New Customer Note Added. Note: Don't assign to Alex S. He's dodgy 	andy" +
+				"27-11-2024 08:53 	New Customer Note Added. Note: This is me making a note to try and trigger some history 	andy" }
             ],
             temperature: 0.3
         });
-
+        console.log(summaryResponse)
         mergedAnalysis.summary = summaryResponse.choices[0].message?.content || '';
 
         // Filter out duplicate points and sort references

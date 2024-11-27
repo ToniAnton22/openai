@@ -2,6 +2,7 @@ import express, { type Request, type Response } from "express";
 import bodyParser from "body-parser";
 import { CaseProcessor } from "./openai";
 import dotenv from "dotenv";
+import { getOpenAIRes } from "./andy";
 
 // Load environment variables
 dotenv.config();
@@ -60,29 +61,27 @@ app.post(
 	// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	async (req: Request<any>, res: any) => {
 		try {
-			const { caseText} = req.body;
+			const caseText =
+				"27-11-2024 08:55 	New Customer Note Added. Note: Pickup location is round the back of Sainsbury's 	andy" +
+				"27-11-2024 08:55 	New Customer Note Added. Note: Don't assign to Alex S. He's dodgy 	andy" +
+				"27-11-2024 08:53 	New Customer Note Added. Note: This is me making a note to try and trigger some history 	andy";
 
-			if (!caseText) {
-				return res.status(400).json({
-					error: "Case text is required",
-				});
-			}
+			// if (!caseText) {
+			// 	return res.status(400).json({
+			// 		error: "Case text is required",
+			// 	});
+			// }
 			// Create a new processor instance if custom options are provided
-			const processor = new CaseProcessor(caseText)
-
-			const analysis = await processor.processCase(caseText);
-
-			// Check confidence threshold
-			if (analysis.confidence < 0.7) {
-				console.warn("Warning: Low confidence analysis generated");
-			}
+			const analysis = await getOpenAIRes(
+				caseText,
+				process.env.OPENAI_API_KEY ?? "",
+			);
 
 			res.json({
 				message: "Case analysis completed successfully",
 				analysis,
 				metadata: {
 					timestamp: new Date().toISOString(),
-					confidenceScore: analysis.confidence,
 					textLength: caseText.length,
 				},
 			});

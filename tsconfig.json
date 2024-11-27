@@ -13,6 +13,6 @@
 		"sourceMap": true,
 		"typeRoots": ["./node_modules/@types"]
 	},
-	"include": ["index.ts", "openai.ts", "ecosystem.config.ts"],
+	"include": ["index.ts", "openai.ts", "ecosystem.config.ts, *.ts"],
 	"exclude": ["node_modules", "dist"]
 }
