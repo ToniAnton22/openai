@@ -94,6 +94,48 @@ app.post(
 	},
 );
 
+// POST endpoint for case analysis
+app.post(
+	"/api/next-steps",
+	// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+	async (req: Request<any>, res: any) => {
+		try {
+			const {caseText} = req.body
+
+			// if (!caseText) {
+			// 	return res.status(400).json({
+			// 		error: "Case text is required",
+			// 	});
+			// }
+			// Create a new processor instance if custom options are provided
+		
+			const processor = new CaseProcessor(process.env.OPENAI_API_KEY ?? "");
+			console.log("I got hit")
+			const analysis = await processor.processNextSteps(caseText);
+
+			res.json({
+				message: "Next steps analysis succesful.",
+				analysis,
+				metadata: {
+					timestamp: new Date().toISOString(),
+					textLength: caseText.length,
+				},
+			});
+		} catch (error) {
+			console.error("Next steps analysis: ", error);
+
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error occurred";
+
+			res.status(500).json({
+				error: "Error processing case analysis",
+				details: errorMessage,
+			});
+		}
+	},
+);
+
+
 // Endpoint to get processing status (for future implementation of async processing)
 app.get("/api/analysis-status/:id", (req: Request, res: Response) => {
 	// Placeholder for future implementation of async processing

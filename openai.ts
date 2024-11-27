@@ -116,4 +116,41 @@ export class CaseProcessor {
 			summary: finalResponse.choices[0].message?.content?.trim() || "",
 		};
 	}
+    public async processNextSteps(nextSteps: string): Promise<CaseAnalysis> {
+		if (!nextSteps || typeof nextSteps !== "string") {
+			throw new Error("Invalid input: caseText must be a non-empty string");
+		}
+
+		if (nextSteps.length > 1000000) {
+			// 1MB limit
+			throw new Error("Text size exceeds maximum limit of 1MB");
+		}
+
+		//	const chunks = await this.splitIntoChunks(caseText);
+		//	const chunkSummaries = await Promise.all(
+		//		chunks.map(this.analyzeChunk.bind(this)),
+		//	);
+
+		// Combine all summaries for a final analysis
+		//	const combinedSummaries = chunkSummaries.join(" ");
+		const finalResponse = await this.openai.chat.completions.create({
+			model: "gpt-3.5-turbo",
+			messages: [
+				{
+					role: "system",
+					content:
+						"You are an assistant who will create 3 suggestions in an order bullet points format based on the text you receive and the events that happen within the text.",
+				},
+				{
+					role: "user",
+					content: `${nextSteps}`,
+				},
+			],
+			temperature: 0.3,
+		});
+
+		return {
+			summary: finalResponse.choices[0].message?.content?.trim() || "",
+		};
+	}
 }
