@@ -21,11 +21,6 @@ const caseProcessor = new CaseProcessor(process.env.OPENAI_API_KEY || "", {
 // Type definitions
 interface CaseAnalysisRequest {
 	caseText: string;
-	options?: {
-		maxTokensPerChunk?: number;
-		overlapTokens?: number;
-		minConfidence?: number;
-	};
 }
 
 interface ErrorResponse {
@@ -66,7 +61,7 @@ app.post(
 	// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	async (req: Request<any>, res: any) => {
 		try {
-			const { caseText, options } = req.body;
+			const { caseText} = req.body;
 
 			if (!caseText) {
 				return res.status(400).json({
@@ -75,14 +70,12 @@ app.post(
 			}
 
 			// Create a new processor instance if custom options are provided
-			const processor = options
-				? new CaseProcessor(process.env.OPENAI_API_KEY || "", options)
-				: caseProcessor;
+			const processor = new CaseProcessor(caseText)
 
 			const analysis = await processor.processCase(caseText);
 
 			// Check confidence threshold
-			if (analysis.confidence < (options?.minConfidence || 0.7)) {
+			if (analysis.confidence < 0.7) {
 				console.warn("Warning: Low confidence analysis generated");
 			}
 
